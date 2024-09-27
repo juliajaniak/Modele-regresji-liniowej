@@ -1,0 +1,431 @@
+---
+title: "Modele regresji liniowej - projekt"
+subtitle: "Zestaw zadań na ocenę 4 i 5"
+author: "Julia Janiak"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Zadanie 1
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lmtest)
+```
+
+# Przygotowanie danych
+
+Rozważamy zależność zmiennej objaśnianej y od zmiennej objaśniającej x.
+
+```{r dane1}
+dane<-read.csv("dane10.csv", sep = ";", dec = ",", header = TRUE)
+head(dane)
+```
+
+Mamy 2 zmienne. Zmienna x jest zmienną objaśniającą, a zmienna y jest zmienną objaśnianą. Wartości są liczbowe, zmiennoprzecinkowe.
+
+# 1. Wykres punktowy zależności y od x
+
+```{r wykres}
+plot(dane$x, dane$y, main = "Wykres punktowy zależności y od x", xlab = "X", ylab = "Y", col = "magenta", xaxp = c(min(dane$x), max(dane$x), 10))
+```
+
+WNIOSKI: Zmiana zmiennej y w zależności od zmiennej x ma wyraźny, nieliniowy charakter. Ze względu na sposób, w jaki układają się punkty, można przypuszczać pewne okresowe zależności. Natomiast widzimy, że są one dość równomiernie rozłożone, co sugeruje, że pomiary lub dane nie wykazują widocznych odstępstw od ogólnego trendu.
+
+ W tym przypadku zastosowanie regresji wielomianowej zamiast liniowej może lepiej uchwycić złożoność danych, ze względu na jego nieliniowość.
+
+# 2. Budowa modelu regresji wielomianowej dla zmiennych x i y
+
+Na wykresie można dostrzec wyraźne dwa minima lokalne oraz dwa maksyma lokalne. To sugeruje nam, że funkcja zmienia swój kierunek około czterokrotnie. Powinniśmy kierować się zatem ku regresji wielomianowej 5 stopnia i sprawdzić jak dobrze pasuje do danych.
+
+Porównajmy zatem model regresji wielomianowej 5 oraz 4 stopnia:
+
+```{r model2}
+model_wiel4<-lm(y ~ poly(x, 4), data = dane)
+model_wiel5<-lm(y ~ poly(x, 5), data = dane)
+
+summary(model_wiel4)
+summary(model_wiel5)
+```
+
+WNIOSKI: Zgodnie z początkową tezą, model regresji 5 stopnia wydaje się lepszy pod względem dopasowania do danych. Ma wyższe wartości R-kwadrat, niższy błąd standardowy reszt oraz wyższą wartość statystyki F. Wszystkie współczynniki w obu modelach są istotne statystycznie na poziomie 0.05.
+
+Charakterystyka modelu: Model wyjaśnia 97.62% zmienności w danych oraz jego reszty mają małą zmienność, co wskazuje na bardzo dobre dopasowanie modelu do danych. Wszystkie współczynniki dla poszczególnych składników wielomianu są statystycznie istotne (p < 2e-16).
+
+Model regresji wielomianowej 5 stopnia dobrze odzwierciedla dane, a wszystkie jego składniki są istotne. Warto jednak pamiętać o ryzyku overfittingu. Jest to model, który dobrze dopasował się do podanych wartości, jednak istnieje ryzyko, że nie będzie tak uniwersalny na innych zestawach danych, ze wględu na swoją złożoność.
+
+# 3. Diagnostyka modelu
+
+Przeprowadźmy diagnostykę modelu z wykorzystaniem testów:
+
+```{r shapiro1}
+shapiro.test(residuals(model_wiel5))
+```
+
+WNIOSKI: P-wartość w teście Shapiro-Wilka wynosi 0.7982, co jest znacznie większe niż typowy poziom istotności. Na poziomie istotności alfa <= 0.05 nie odrzucamy hipotezy H0 mówiącej o normalnym rozkładzie składników losowych.
+
+```{r breuscha-pagana1}
+bptest(model_wiel5)
+```
+
+WNIOSKI: Test Breuscha-Pagana wykazał p-wartość wynoszącą 0.04644. Jest to wartość nieco poniżej typowego poziomu istotności 0.05. Oznacza to, że możemy mieć podstawy do odrzucenia hipotezy zerowej o stałej wariancji reszt. Wariancja reszt może być zmienna w zależności od wartości zmiennych objaśniających.
+
+Test ten jest głównie stosowany do analizy dużych zbiorów danych. Porównajmy go z testem Goldfelda-Quandta, który jest bardziej odpowiedni dla mniejszych próbek danych.
+
+```{r goldfelda-quandta two-sided1}
+gqtest(model_wiel5, alternative = "two.sided")
+```
+
+WNIOSKI: Porównujemy wariancję dla reszt w dwóch grupach. P-wartość wyniosła 0.8267, co jest znacznie wyższym wynikiem niż typowy poziom istotności. To oznacza, że nie ma podstaw do odrzucenia hipotezy zerowej, co sugeruje, że nie ma istotnych dowodów na zmiany wariancji reszt między dwoma segmentami danych.
+
+Wynik tego testu dał nam zupełnie inne wnioski. Test Goldfelda-Quandta jest bardziej wiarygodny ze względu na jego dopasowanie do naszego zbioru danych. Zatem, wariancja reszt jest prawdopodobnie stała, co jest zgodne z jednym z założeń klasycznej regresji liniowej.
+
+```{r breuscha-godfreya1}
+bgtest(model_wiel5)
+```
+
+WNIOSKI: W tym teście p-wartość wynosi 0.8502. Jest to wynik wyższy niż 0.05, a więc nie ma podstaw do odrzucenia hipotezy zerowej. Nie ma istotnych dowodów na autokorelację reszt w modelu. Reszty więc nie są skorelowane między sobą, co jest zgodne z założeniem niezależności reszt.
+
+PODSUMOWANIE: Wyniki testów wskazują, że nie ma podstaw do odrzucenia żadnego z kluczowych założeń modelu. Oznacza to, że model jest dobrze dopasowany i można na jego podstawie uzyskać wiarygodne wnioski.
+
+## Wykresy diagnostyczne
+
+```{r wykresy diagnostyczne1}
+par(mfrow = c(2, 2))
+plot(model_wiel5)
+```
+
+WNIOSKI: Wykres reszt względem dopasowanych wartości pokazuje, że reszty są losowo rozproszone wokół linii poziomej, a więć założenie liniowości jest spełnione. Są natomiast pewne skupienia punktów w centrum. Również co najważniejsze, istnieją pewne punkty odstające (10, 83), które mogą wpływać na model i należy je dalej zbadać.
+
+Na wykresie reszt kwantyl-kwantyl punkty układają się wzdłuż linii prostej, co wskazuje, że rozkład reszt jest zbliżony do rozkładu normalnego. Jednak widać, że nie jest to idealna linia prosta i na samych krańcach są nieznaczne odchylenia (10, 80, 83). Może to wskazywać na pewne problemy z normalnością reszt.
+
+Trzeci wykres pokazuje nam, że wartości są w miarę równomiernie rozproszone wokół linii poziomej, ale istnieją pewne wzorce, które mogą sugerować niewielkie problemy. Po raz kolejny: punkty 10, 80 oraz 83 są tutaj punktami odstającymi.
+
+Wykres reszt względem dźwigni identyfikuje obserwacje o wysokiej dźwigni, które mogą być potencjalnymi obserwacjami odstającymi. Punkty takie jak 80, 83 i 86 powinny zostać głębiej ocenione i prawdopodobnie usunięte z modelu, ponieważ mają dużą dźwignię.
+
+PODSUMOWANIE: Model wydaje się spełniać założenia liniowości i normalności reszt, chociaż są pewne obserwacje odstające, które mogą wpływać na wyniki.
+
+## Analiza punktów odstających
+
+Możemy sprawdzić czy podane wartości odstające oraz o wysokiej dźwigni mocno wpływają na nasz model. Usuniemy więc je wszystkie i sprawdzimy jak będzie wyglądać nowy model:
+
+```{r nowy model1}
+new_model_wiel5 = lm(y ~ poly(x, 5), subset=(1:100)[-c(10, 80, 83, 86)], data = dane)
+summary(new_model_wiel5)
+```
+
+WNIOSKI: Nowy model, po usunięciu wyznaczonych obserwacji, wykazuje nieco lepsze dopasowanie do danych w porównaniu do poprzedniego modelu. To poprawione dopasowanie jest widoczne w wyższej wartości R-kwadrat, która teraz wynosi 0.9805. Dodatkowo, model ten charakteryzuje się niższym standardowym błędem reszt oraz wyższą statystyką F.
+
+Oba modele są bardzo dobre, jednak nowy model prezentuje niewielką, lecz istotną poprawę.
+
+# 4. Budowa modelu regresji liniowej dla zmiennej objaśnianej y i zmiennych objaśniających |x-a1|, |x-a2|, ..., |x-an|
+
+Możemy jeszcze raz przeanalizować wykres punktowy zależności y od x. Najlepiej w tym przypadku bazować na lokalnych ekstremach tej funkcji. 
+
+Wybierzmy więc 4 punkty, które ukazują znaczące zmiany na wykresie (ekstrema lokalne), czyli:
+```{r punkty}
+a1<-0.1
+a2<-0.35
+a3<-0.7
+a4<-1.0
+```
+
+Następnie możemy wyłonić zmienne objaśniające oraz zbudować z nich model regresji liniowej:
+```{r modelek}
+dane$X1<-abs(dane$x - a1)
+dane$X2<-abs(dane$x - a2)
+dane$X3<-abs(dane$x - a3)
+dane$X4<-abs(dane$x - a4)
+
+model_abs<-lm(y ~ X1 + X2 + X3 + X4, data = dane)
+
+summary(model_abs)
+```
+
+WNIOSKI: Wartość R-kwadrat wynosi 0.9761, co wskazuje na bardzo dobre dopasowanie modelu do danych. Jest to prawie ten sam wynik co przy modelu pierwotnym. Błąd standardowy reszt jest mniejszy w drugim modelu, jednak jest to tak samo nieznaczna różnica. Skorygowany R-kwadrat na poziomie 0.9751 sugeruje, że model dobrze radzi sobie z dopasowaniem do danych, uwzględniając liczbę zmiennych.
+
+Mediana jest bliska 0, co sugeruje, że model nie ma systematycznych błędów. Każda z wartości w modelu ma wpływ na zmienną y, przy czym x2, x3 i x4 mają największy wpływ (p < 2e-16).
+P-wartość dla F-statystyki jest mniejsza niż 2.2e-16, co oznacza, że model jako całość jest bardzo dobry.
+
+Podsumowując, model może być używany do estymacji przyszłych wartości. Zawiera istotne zmienne, które wyjaśniają zmienność zmiennej y na dobrym poziomie.
+
+# 5. Diagnostyka nowego modelu
+
+Przeprowadźmy diagnostykę naszego nowego modelu z wykorzystaniem testów:
+
+```{r shapiro2}
+shapiro.test(residuals(model_abs))
+```
+
+WNIOSKI: P-wartość testu Shapiro-Wilka wynosi 0.1183, co jest większe niż przyjęty poziom istotności. Oznacza to, że nie ma podstaw do odrzucenia hipotezy zerowej, która stwierdza, że reszty pochodzą z rozkładu normalnego.
+
+```{r breuscha-pagana2}
+bptest(model_abs)
+```
+
+WNIOSKI: Test Breuscha-Pagana zwrócił p-wartość 0.03463, co jest nieco poniżej standardowego poziomu istotności 0.05. To sugeruje, że możemy mieć podstawy, aby odrzucić hipotezę zerową o stałej wariancji reszt. Wskazuje to, że wariancja reszt może się zmieniać w zależności od wartości zmiennych objaśniających.
+
+Tak samo jak w poprzednim modelu, dla porównania zastosujmy test Goldfelda-Quandta, który jest bardziej odpowiedni dla mniejszych próbek danych.
+
+```{r goldfelda-quandta two-sided2}
+gqtest(model_abs, alternative = "two.sided")
+```
+
+WNIOSKI: P-wartość wynosząca 0.1797 jest większa od typowego poziomu istotności. Na każdym poziomie istotności alfa <= 0.05 nie ma podstaw do odrzucenia hipotezy H0, mówiącej, że składnik losowy ma jednorodną wariancję. Wariancja reszt jest prawdopodobnie stała. Musimy jednak pamiętać, że 0.1797 nie jest aż tak większe od 0.05.  
+
+Tak jak poprzednio, uzyskany wynik dał inny wniosek. Pod uwagę jednak bierzemy test Goldfelda-Quandta ze względu na jego dopasowanie do małego zbioru danych. Zatem najprawdopodobniej jest spełnione założenie o stałej wariancji reszt. 
+
+```{r breuscha-godfreya2}
+bgtest(model_abs)
+```
+
+WNIOSKI: W tym teście p-wartość wynosi 0.3889. Jest to wynik wyższy niż 0.05, a reszty nie są skorelowane między sobą, co jest zgodne z założeniem niezależności reszt. Na każdym poziomie istotności alfa <= 0.05 nie ma podstaw do odrzucenia hipotezy H0 mówiącej o niezależności składnika losowego epsilona.
+
+PODSUMOWANIE: Wyniki testów znów sugerują, że nie ma podstaw do odrzucenia żadnego z kluczowych założeń modelu. W związku z tym model wydaje się być odpowiednio dopasowany i można na jego podstawie formułować wiarygodne wnioski.
+
+## Wykresy diagnostyczne
+
+```{r wykresy diagnostyczne2}
+par(mfrow = c(2, 2))
+plot(model_abs)
+```
+
+WNIOSKI: Wykres Residuals vs Fitted wskazuje pewne odchylenia od idealnej liniowości, zwłaszcza w skrajnych wartościach dopasowanych (górne i dolne krańce). Linia trendu może sugerować pewną nieliniowość w danych. Model może nie w pełni odzwierciedlać zależność między zmiennymi.
+
+Drugi wykres obrazuje, że większość punktów układa się blisko linii prostej, co obrazuje nam, że reszty mają rozkład zbliżony do normalnego, jednak w skrajnych kwantylach widać pewne odchylenia, szczególnie w prawym krańcu (punkt 43). Te odchylenia mogą wskazywać na obecność wartości odstających.
+
+Wykres Scale-Location pokazuje, że rozrzut punktów wydaje się niejednolity, zwłaszcza przy mniejszych wartościach. Linia trendu wskazuje na pewną nieliniowość i zmienną wariancję. Model ma trudności z uchwyceniem zmienności zmiennej zależnej.
+
+Na ostatnim wykresie szukamy punktów o dużej dźwigni, które mogą mieć zbyt duży wpływ na model. Kilka punktów (43, 97, 80) jest zaznaczonych jako potencjalnie odstające. Punkt 43 znajduje się blisko granicy obszaru Cooka i najprawdopodobniej zaburza wynikowy model.
+
+PODSUMOWANIE: Model regresji liniowej ma dobre dopasowanie do danych, jednak istnieją pewne odchylenia od idealnych założeń modelu (które mogą wynikać z przekształcenia danych). Widać pewne nieliniowości w zależności między resztami, a wartościami dopasowanymi oraz istnieją znaczące wartości odstające. Dopiero na wykresach widać, że nowy model może nie być najlepszym wyborem i jednak lepszym rozwiązaniem będzie model regresji wielomianowej.
+
+# 6. Porównanie modelów na zbiorach testowych
+
+Aby dokładnie ocenić skuteczność uzyskanych modeli regresji, warto przeprowadzić porównanie wyników na zbiorach testowych. Będzie można ocenić czy nowy model, zawierający dodatkowe zmienne, jest lepszy niż pierwotny model regresji wielomianowej piątego stopnia, czy może oferuje gorsze wyniki.
+
+```{r zbiór uczący i testowy}
+set.seed(123)
+
+train.indx<-sample(c(TRUE,FALSE), nrow(dane), prob = c(0.7,0.3), replace = T)
+train.dane<-dane[train.indx,]
+test.dane<-dane[!train.indx,]
+
+model_train_wiel<-lm(y ~ poly(x, 5), data = train.dane)
+model_train_lin<-lm(y ~ X1 + X2 + X3 + X4, data = train.dane)
+
+pred_wiel<-predict(model_train_wiel, newdata = test.dane)
+pred_lin<-predict(model_train_lin, newdata = test.dane)
+
+y_i = test.dane$y
+SSE_wiel<-sum((y_i-pred_wiel)^2)
+SSE_lin<-sum((y_i-pred_lin)^2)
+```
+```{r porównanie}
+cat("Suma kwadratów błędów dla modelu regresji wielomianowej piątego stopnia:", SSE_wiel)
+cat("Suma kwadratów błędów dla modelu regresji liniowej z przekształconymi zmiennymi:", SSE_lin)
+```
+
+WNIOSKI: Suma kwadratów błędów dla modelu regresji wielomianowej piątego stopnia wynosi 0.03575392, podczas gdy dla modelu regresji liniowej z przekształconymi zmiennymi SSE wynosi 0.05677414. Niższa wartość SSE dla modelu regresji wielomianowej sugeruje, że ten model lepiej przewiduje zmienną y na zbiorze testowym w porównaniu do drugiego modelu.
+
+Model regresji wielomianowej piątego stopnia, mimo większej złożoności, lepiej dopasowuje się do danych testowych. Oznacza to, że wyższy stopień wielomianu był w stanie uchwycić bardziej skomplikowane wzorce w danych, co przekłada się na mniejsze błędy prognozowania. Model regresji liniowej z przekształconymi zmiennymi, choć prostszy, nie zapewniał tak dobrej precyzji w przewidywaniu zmiennej y.
+
+# Wnioski końcowe do zadania 1
+
+Wykresy diagnostyczne ujawniły znaczącą różnicę pomiędzy dwoma wykresami. Pierwszy model spełniał konieczne założenia z kilkoma wartościami odstającymi. Natomiast model regresji liniowej, oprócz wartości odstających, również miał problem z liniowością modelu.
+
+Ostatecznie, zastosowanie regresji wielomianowej piątego stopnia wydaje się być lepszym rozwiązaniem. Model regresji liniowej z przekształconymi zmiennymi (opartymi na lokalnych ekstremach) dobrze dopasowuje się do danych, ale jego suma kwadratów błędów jest wyższa niż w przypadku modelu regresji wielomianowej piątego stopnia. Oznacza to, że choć model ten jest prostszy, to nie jest w stanie uchwycić złożoności danych tak skutecznie jak model wielomianowy.
+
+# Zadanie 2
+
+# Przygotowanie danych
+
+Rozważamy zależność zmiennej objaśnianej y od zmiennych objaśniających x1, x2, ..., x6.
+
+```{r dane}
+data<-read.csv("Dane_10.csv", sep = ";", dec = ",", header = TRUE)
+head(data)
+```
+
+Mamy 6 zmiennych objaśniających - (x1, x2, x3, x4, x5, x6) oraz 1 zmienną objaśnianą - y. Wartości są liczbowe, zmiennoprzecinkowe.
+
+# 1. Tworzenie modelu regresji liniowej
+
+```{r model}
+model<-lm(y ~ ., data = data)
+summary(model)
+```
+
+WNIOSKI: Nasz model regresji liniowej z sześcioma zmiennymi niezależnymi bardzo dobrze dopasowuje się do danych. Świadczy o tym wysokie R-kwadrat wynoszące 0.9999, co oznacza, że 99.99% zmienności zmiennej zależnej y jest wyjaśniane przez zmienne znajdujące się w modelu.
+
+Dopasowanie modelu jest również bardzo dobre. Zmienne x1 i x3 są istotnymi zmiennymi objaśniającymi, co pokazuje bardzo niska p-wartość (p < 2e-16) oraz wysokie wartości statystyki t dla tych zmiennych.
+Zmienne x2, x4, x5 i x6 nie są istotne statystycznie w tym modelu, ponieważ ich wartości p są znacznie większe niż typowy poziom istotności 0.05. 
+
+Reszty w modelu są niewielkie, co dodatkowo potwierdza, że model jest dobrze dopasowany do danych. W podsumowaniu całego modelu, wysoka statystyka F oraz niska p-wartość potwierdzają, że model jako całość jest istotny statystycznie.
+
+# 2. Diagnostyka modelu
+
+Na samym początku przeprowadźmy diagnostykę modelu podstawowego z wykorzystaniem testów:
+
+```{r shapiro}
+shapiro.test(residuals(model))
+```
+
+WNIOSKI: Test normalności reszt wykazał, że p-wartość wynosząca 0.2942, jest większa niż typowy poziom istotności 0.05. Nie ma więc podstaw do odrzucenia hipotezy zerowej, która zakłada, że reszty modelu pochodzą z rozkładu normalnego.
+
+```{r breuscha-pagana}
+bptest(model)
+```
+
+WNIOSKI: Wynikiem testu Breuscha-Pagana jest p-wartość wynosząca 0.2088. Na każdym poziomie istotności alfa <= 0.05 nie ma podstaw do odrzucenia hipotezy H0, mówiącej, że składnik losowy ma jednorodną wariancję. Wariancja reszt jest prawdopodobnie stała.  
+
+Test ten jednak jest przede wszystkim wykorzystywany do badania dużych zbiorów danych. Przyrównajmy więc go do testu Goldfelda-Quandta, który jest odpowiedni dla mniejszych próbek danych.
+
+```{r goldfelda-quandta two-sided}
+gqtest(model, alternative = "two.sided")
+```
+
+WNIOSKI: Porównujemy wariancję dla reszt w dwóch grupach. P-wartość wynosząca 0.9209 jest znacznie większa niż 0.05, co sugeruje, że nie ma dowodów na to, iż wariancja reszt zmienia się pomiędzy dwoma segmentami danych. Oznacza to, że nie ma podstaw do odrzucenia hipotezy H0. 
+
+Wynik tego testu dał nam te same wnioski, a więc założenie o stałej wariancji reszt jest spełnione.
+
+```{r breuscha-godfreya}
+bgtest(model)
+```
+
+WNIOSKI: Test Breuscha-Godfreya wykazał, że p-wartość wynosząca 0.6906 jest znacznie większa niż 0.05, co sugeruje brak autokorelacji w resztach modelu. Reszty nie są skorelowane między sobą, co jest zgodne z założeniem niezależności reszt. Na każdym poziomie istotności alfa <= 0.05 nie ma podstaw do odrzucenia hipotezy H0 mówiącej o niezależności składnika losowego epsilona.
+
+PODSUMOWANIE: Wyniki testów wskazują, że nie ma podstaw do odrzucenia któregokolwiek z założeń. Posługiwanie się tym modelem da nam dobre wnioski.
+
+## Wykresy diagnostyczne
+
+```{r wykresy diagnostyczne}
+par(mfrow = c(2, 2))
+plot(model)
+```
+
+WNIOSKI: Wykres Residuals vs Fitted wskazuje, że reszty są dość losowo rozproszone wokół osi poziomej. Jednak, możemy zaobserwować, że dużo reszt układa się na początku wykresu. Możliwe, że występują pojedyńcze odstępstwa od liniowości modelu. Istnieje również kilka punktów (13, 69, 76), które mogą być uznane za odstające, co może wpływać na ogólną jakość dopasowania modelu.
+
+Drugi z wykresów, czyli wykres kwantylowy pokazuje, że rozkład reszt jest bardzo zbliżony do rozkładu normalnego. Większość jego punktów znajduje się blisko linii prostej. Jednak na końcach rozkładu (szczególnie dla dużych wartości standardowych reszt) widać pewne odchylenia, co może sugerować obecność pewnych odstających obserwacji.
+
+Wykres Scale-Location, wskazuje nam nieznaczny wykres krzywoliniowy. Może to wskazywać, że reszty mają tendencję do zmiany w zależności od wartości dopasowanych.
+
+Wykres reszt względem dźwigni pokazuje, że większość punktów mieści się w obszarze o niskiej wartości dźwigni i niskich resztach. Jednakże kilka obserwacji (np. punkt 13) znajduje się dalej od głównego skupienia danych, co może wskazywać na obecność punktów o większym wpływie na model.
+
+PODSUMOWANIE: Model ogólnie wydaje się być bardzo dobrze dopasowany, chociaż pewne wnioski sugerują, że warto zbadać obserwacje odstające, które mogą wpływać na oszacowania.
+
+## Identyfikacja punktów odstających i ocena wpływu obserwacji na model regresji
+
+Aby móc stworzyć jeszcze bardziej wydajny model regresji liniowej możemy przyjrzeć się wartościom odstającym oraz innym wartościom wpływającym na oszacowanie współczynników modelu i spróbować je wyeliminować:
+
+```{r wartości odstające i wpływające}
+
+##1 metoda
+which(hatvalues(model)>14/100 & abs(rstudent(model))>2)
+
+##2 metoda
+which(cooks.distance(model)>4/(100-(6+1))) 
+```
+
+WNIOSKI: Żaden z punktów nie spełnia kryteriów o dużej dźwigni. Natomiast punkty 1, 13, 33, 76, i 83 mają wartości Cooka przekraczające próg, co świadczy o tym, że są uważane za wpływowe i mają potencjał do znaczącego wpływu na oszacowania modelu. 
+
+Należy przeprowadzić dalszą analizę, aby sprawdzić, czy mogą mieć istotne znaczenie w modelu regresji.
+
+```{r nowy model}
+new_model = lm(y ~ ., subset=(1:100)[-c(1,13,33,76,83)], data = data)
+summary(new_model)
+```
+
+WNIOSKI: Nowy model, po usunięciu kluczowych obserwacji, wykazuje lepsze dopasowanie do danych w porównaniu do poprzedniego modelu. Jest to widoczne w mniejszych wartościach reszt oraz w niższym standardowym błędzie reszt, co wskazuje na bardziej precyzyjne oszacowania i mniejsze rozproszenie wyników wokół linii regresji.
+
+Istotną zmianą jest współczynnik zmiennej x6, który w nowym modelu staje się istotny statystycznie (p=0.0482), podczas gdy w poprzednim modelu był nieistotny (p=0.163). Sugeruje to, że wykluczenie kilku obserwacji mogło wpłynąć na lepsze rozpoznanie wpływu tej zmiennej na zmienną zależną.
+
+Pozostałe współczynniki są porównywalne między modelami, a kluczowe zmienne, takie jak x1 i x3, nadal wykazują silny i istotny wpływ na zmienną zależną.
+
+Nowy model ma nieco wyższą statystykę F, co również świadczy o lepszym dopasowaniu. Wysokie wartości R-kwadrat w obu modelach wskazują na bardzo dobrą zgodność z danymi, ale nowy model wydaje się być bardziej precyzyjny.
+
+# 3. Liniowa zależność zmiennych objaśniających
+
+```{r liniowa zależność}
+
+#Macierz korelacji
+cor(data[, c("x1","x2","x3","x4","x5","x6")])
+
+#Wykresy rozrzutu
+pairs(data[, c("x1","x2","x3","x4","x5","x6")], main = "Wykresy rozrzutu zmiennych x1, x2, ..., x6", col = "darkblue")
+```
+
+WNIOSKI:  Istnieje wyraźna liniowa zależność między zmiennymi x3 i x4 oraz x3 i x5. 
+Natomiast największa liniowa zależność na poziomie 0.98 występuje pomiędzy zmiennymi x4 i x5. Zmienne te tworzą linię prostą ze skumulowanych punktów. Oznacza to więc, że jedna zmienna jest mocno zależna od drugiej zmiennej i mają one największą korelację. Może to wskazywać na problem współliniowości.
+
+Jednak większość par zmiennych nie wykazuje wyraźnych wzorców zależności, co sugeruje, że często zmienne nie są ze sobą silnie powiązane liniowo. Obserwowane zależności mogą być nieliniowe lub bardzo słabe.
+
+# 4. Wybór modelu z dwiema zmiennymi objaśniającymi
+
+Aby udoskonalić model, należy często usunąć z niego mało znaczące zmienne, które mogą tylko zaburzać prawidłowe działanie. Z poprzednich analiz wynikało, że najbardziej istotne są zmienne x1 oraz x3. Sprawdźmy, czy będzie miało to pokrycie z wynikami poniższych metod eliminacji i dołączania.
+
+## Metoda eliminacji
+
+```{r eliminacja}
+model_del = step(model, direction = "backward")
+summary(model_del)
+```
+
+WNIOSKI: Proces selekcji zmiennych doprowadził do najlepszego modelu, który zawiera tylko zmienne x1 i x3. Zgadza się to z naszą pierwotną tezą na ten temat.
+
+Model został wybrany na podstawie najniższej wartości AIC = -738.24. Po każdej eliminacji zmiennych AIC się poprawiało, co oznaczało lepsze dopasowanie modelu przy mniejszej liczbie zmiennych.
+Zmienne x2, x4, x5 i x6 nie miały istotnego wpływu na model, a ich obecność mogła prowadzić do overfittingu.
+Zmienne x1 i x3 są najbardziej istotne na poziomie istotności p < 2e-16, co oznacza, że mają silny wpływ na zmienną zależną y.
+
+Bardzo wysoka wartość R-kwadrat = 0.9999 wskazuje, że model bardzo dobrze dopasowuje się do danych. Niska wartość błędu standardowego reszt sugeruje, że prognozy modelu są bardzo precyzyjne i odchylenia są minimalne.
+
+PODSUMOWANIE: Ten model jest lepszym modelem niż pierwotny, ponieważ zawiera w sobie tylko te zmienne, które mają znaczący wpływ i najlepiej wyjaśniają zmienność zmiennej y.
+
+## Metoda dołączania
+
+```{r dołączanie}
+model_null<-lm(y ~ 1, data = data)
+
+model_add<-step(model_null, direction = "forward", scope = list(lower = ~ 1, upper = formula(model)))
+summary(model_add)
+```
+
+WNIOSKI: Spośród wszystkich zmiennych, dodanie x3 do modelu skutkowało największym spadkiem wartości AIC do -93.7, co oznacza znaczną poprawę modelu. Zmienna x3 wykazuje silny wpływ na zmienną zależną y. Kolejną zmienną dodaną do modelu była x1, co spowodowało dalszy, znaczny spadek wartości AIC do -738.24. Zmienne x2, x4, x5 i x6 zostały odrzucone, gdyż ich dodanie nie poprawiłoby dopasowania modelu.
+
+PODSUMOWANIE: Oba modele wykazały, że zmienne x1 i x3 są najważniejsze dla predykcji zmiennej zależnej y. W obu przypadkach doszliśmy do tych samych wniosków i tego samego modelu. Daje to tym samym większe zapewnienie, że taki model jest najbardziej optymalnym rozwiązaniem.
+
+# 5. Porównanie modelów na zbiorach testowych
+
+Aby ocenić skuteczność uzyskanych modelów regresji, można przeprowadzić porównanie wyników na zbiorach testowych. Taka analiza pozwoli ocenić, czy uproszczony model z mniejszą liczbą zmiennych zachowuje wysoki poziom predykcji, przy czym unika nadmiernego dopasowania do danych uczących. 
+
+```{r zbiór uczący i testowy2}
+set.seed(123)
+
+train.ind<-sample(c(TRUE,FALSE), nrow(data), prob = c(0.7,0.3), replace = T)
+train.data<-data[train.ind,]
+test.data<-data[!train.ind,]
+
+model_train_full<-lm(y ~ ., data = train.data)
+model_train_reduced<-lm(y ~ x1 + x3, data = train.data)
+
+pred_full<-predict(model_train_full, newdata = test.data)
+pred_reduced<-predict(model_train_reduced, newdata = test.data)
+
+y_i = test.data$y
+SSE_full<-sum((y_i-pred_full)^2)
+SSE_reduced<-sum((y_i-pred_reduced)^2)
+```
+```{r porównanie2}
+cat("Suma kwadratów błędów dla modelu pełnego:", SSE_full)
+cat("Suma kwadratów błędów dla modelu z dwiema zmiennymi:", SSE_reduced)
+```
+
+WNIOSKI: Niższa wartość SSE dla modelu z dwiema zmiennymi (x1 i x3) sugeruje, że tak zredukowany model lepiej przewiduje zmienną zależną y na zbiorze testowym niż model pełny. 
+
+Mimo, że model pełny wykorzystuje więcej informacji (wszystkie zmienne), wypada on gorzej. Wyższa wartość SSE wskazuje na możliwość nadmiernego dopasowania przez zbyt dużą ilość zmiennych, co skutkuje gorszymi prognozami na nowych danych.
+
+# Wnioski końcowe do zadania 2
+
+Początkowy model regresji liniowej z sześcioma zmiennymi objaśniającymi wykazał bardzo wysokie R-kwadrat równe 0.9999, co sugeruje bardzo dobre dopasowanie do danych. Jednakże, analiza statystyczna wykazała, że zmienne x2, x4, x5 i x6 były nieistotne dla modelu. Za to zmienne x1 i x3 były kluczowe dla modelu, z bardzo niskimi p-wartość i wysokimi statystykami t. Metoda eliminacji oraz dołączania zmiennych potwierdziła początkową tezę.
+
+Model zredukowany (z dwiema zmiennymi: x1 i x3) lepiej przewiduje zmienną zależną na zbiorze testowym niż model pełny. Niższa suma kwadratów błędów dla modelu zredukowanego sugeruje, że uproszczenie modelu zmniejszyło overfitting.
